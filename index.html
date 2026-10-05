@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Token 奖励卡片 · 交互演示</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- 背景装饰 -->
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+  <div class="bg-grid"></div>
+
+  <!-- 演示页主区域 -->
+  <main class="stage">
+    <p class="stage-badge">ZCODE · 领奖体验复刻</p>
+    <h1 class="stage-title">恭喜！你领取了 <span class="grad">1 亿</span> Token</h1>
+    <p class="stage-desc">
+      点击下方按钮，重现领取成功的弹窗卡片——支持弹窗入场动画、金额数字滚动、
+      彩带喷发、3D 视差倾斜、明细展开与领取到账等交互。
+    </p>
+    <button class="trigger-btn" id="triggerBtn">🎁 模拟领取奖励</button>
+    <p class="stage-hint">
+      弹窗打开后：鼠标悬停卡片可体验 3D 视差 · 按 <kbd>Esc</kbd> 或点击遮罩可关闭
+    </p>
+  </main>
+
+  <!-- 奖励弹窗卡片 -->
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="reward-card" id="rewardCard" role="dialog" aria-modal="true" aria-labelledby="cardTitle">
+      <button class="close-btn" id="closeBtn" aria-label="关闭">&times;</button>
+      <div class="card-tilt" id="cardTilt">
+        <div class="shine"></div>
+
+        <div class="icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M13 2 L4.5 13.5 H11 L10 22 L18.5 10.5 H12 Z"
+                  fill="#ffffff" stroke="#ffffff" stroke-width="1" stroke-linejoin="round"/>
+          </svg>
+        </div>
+
+        <p class="card-eyebrow">TOKEN REWARD</p>
+        <h2 class="card-title" id="cardTitle">恭喜，领取成功！</h2>
+
+        <div class="amount-row">
+          <span class="amount" id="amountValue">0</span>
+          <span class="amount-unit">Token</span>
+        </div>
+
+        <p class="card-subtitle" id="cardSubtitle">1 亿 Token 已到账，祝您码力全开 🚀</p>
+
+        <div class="detail" id="detailBox">
+          <div class="detail-item"><span>新手专享礼包</span><b>2,000 万</b></div>
+          <div class="detail-item"><span>邀请好友奖励</span><b>3,000 万</b></div>
+          <div class="detail-item"><span>限时冲榜活动</span><b>5,000 万</b></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="detailBtn">查看明细</button>
+          <button class="btn btn-primary" id="claimBtn">开心收下</button>
+        </div>
+
+        <p class="card-foot">额度有效期至 2026-12-31 · 不可提现 · <a href="#" id="ruleLink">使用规则</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 彩带画布 & 轻提示 -->
+  <canvas id="confetti"></canvas>
+  <div class="toast" id="toast"></div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

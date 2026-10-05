@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学习笔记 · Token 奖励卡片的动画与交互</title>
+<style>
+  /* ============ 基础 ============ */
+  :root {
+    --bg: #0a0c14;
+    --text: #f4f6ff;
+    --muted: #9aa3c0;
+    --line: rgba(255, 255, 255, .08);
+    --panel: rgba(255, 255, 255, .03);
+    --grad-1: #8b5cf6;
+    --grad-2: #4f8cff;
+    --grad-3: #22d3ee;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    overflow-x: hidden;
+  }
+  a { color: #8ea0ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    font-family: Consolas, "JetBrains Mono", "Courier New", monospace;
+    font-size: .88em;
+    background: rgba(139, 92, 246, .12);
+    border: 1px solid rgba(139, 92, 246, .25);
+    border-radius: 5px;
+    padding: 1px 6px;
+    color: #c9b8ff;
+  }
+  pre {
+    background: #0d0f19;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 12px 0 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: #c8d2f0;
+  }
+  pre code { all: unset; font-family: inherit; color: inherit; }
+  .cm { color: #5f9f6e; } /* 注释 */
+
+  /* ============ 背景装饰 ============ */
+  .bg-blob {
+    position: fixed; border-radius: 50%;
+    filter: blur(100px); opacity: .35;
+    pointer-events: none; z-index: 0;
+  }
+  .bg-blob-1 { width: 480px; height: 480px; background: #2b2f7e; top: -180px; left: -140px; }
+  .bg-blob-2 { width: 420px; height: 420px; background: #0e4a5e; bottom: -160px; right: -120px; }
+
+  /* ============ 页头 ============ */
+  .wrap { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 56px 22px 80px; }
+  .crumb { font-size: 12px; letter-spacing: .18em; color: #8ea0ff; margin-bottom: 14px; }
+  h1 { font-size: clamp(26px, 4.5vw, 38px); line-height: 1.3; margin-bottom: 14px; }
+  .grad {
+    background: linear-gradient(90deg, #a78bfa, #60a5fa, #22d3ee);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede { color: var(--muted); max-width: 640px; }
+  .toc {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px;
+  }
+  .toc a {
+    font-size: 13px; padding: 7px 14px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel);
+    transition: .2s;
+  }
+  .toc a:hover { border-color: rgba(139, 92, 246, .5); text-decoration: none; transform: translateY(-1px); }
+
+  /* ============ 章节标题 ============ */
+  section { margin-top: 64px; scroll-margin-top: 24px; }
+  .sec-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .sec-num {
+    width: 40px; height: 40px; flex: none; border-radius: 12px;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 16px; color: #fff;
+    background: linear-gradient(135deg, var(--grad-1), var(--grad-2) 60%, var(--grad-3));
+    box-shadow: 0 6px 20px rgba(99, 102, 241, .35);
+  }
+  .sec-head h2 { font-size: 22px; }
+  .sec-desc { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+  /* ============ 技术难点卡片 ============ */
+  .d-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+  }
+  .d-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .d-tag {
+    flex: none; font-size: 11px; font-weight: 700; color: #8ea0ff;
+    border: 1px solid rgba(142, 160, 255, .4); border-radius: 6px; padding: 1px 7px;
+  }
+  .d-head h3 { font-size: 16.5px; }
+  .d-card p { font-size: 14px; color: #c3cbe8; }
+  .d-card p b { color: #fff; }
+
+  /* ============ 知识点列表 ============ */
+  .k-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  .k-group {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 18px; padding: 20px 22px;
+  }
+  .k-group h3 {
+    font-size: 15px; margin-bottom: 12px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--line); color: #cdd5f5;
+  }
+  .k-group ul { list-style: none; }
+  .k-group li { font-size: 13.5px; color: #b7c0de; padding: 7px 0; position: relative; padding-left: 18px; }
+  .k-group li::before {
+    content: ""; position: absolute; left: 2px; top: 15px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--grad-1), var(--grad-3));
+  }
+  .k-group li code { font-size: .82em; }
+
+  /* ============ 动画演示 ============ */
+  .a-row {
+    display: grid; grid-template-columns: 1fr 350px; gap: 20px; align-items: stretch;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 18px; padding: 20px 22px; margin-bottom: 18px;
+  }
+  .a-info h3 { font-size: 16px; margin-bottom: 6px; }
+  .a-info p { font-size: 13.5px; color: #b7c0de; }
+  .a-side { display: flex; flex-direction: column; gap: 10px; }
+  .a-stage {
+    position: relative; flex: 1; min-height: 150px;
+    border-radius: 14px; overflow: hidden;
+    background: rgba(0, 0, 0, .25);
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .replay {
+    align-self: flex-end;
+    font-family: inherit; font-size: 12.5px; color: #cdd5f5;
+    background: rgba(255, 255, 255, .07);
+    border: 1px solid var(--line); border-radius: 9px;
+    padding: 7px 14px; cursor: pointer; transition: .2s;
+  }
+  .replay:hover { background: rgba(255, 255, 255, .14); transform: translateY(-1px); }
+  .replay:active { transform: scale(.97); }
+
+  /* ① popIn */
+  #popDemo { width: 170px; height: 96px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--grad-1), var(--grad-2) 60%, var(--grad-3));
+    display: grid; place-items: center; font-size: 13px; font-weight: 600;
+    box-shadow: 0 10px 26px rgba(99, 102, 241, .4); }
+  #popDemo.playing { animation: popIn .55s cubic-bezier(.2, 1.4, .3, 1) both; }
+  @keyframes popIn {
+    from { transform: scale(.6) translateY(18px); opacity: 0; }
+    to   { transform: scale(1) translateY(0);     opacity: 1; }
+  }
+
+  /* ② rise 错峰 */
+  #riseDemo { gap: 10px; }
+  #riseDemo .chip {
+    font-size: 12.5px; color: #cdd5f5; padding: 7px 14px;
+    border-radius: 999px; background: rgba(255, 255, 255, .08);
+    border: 1px solid var(--line);
+  }
+  #riseDemo.playing .chip { animation: rise .5s cubic-bezier(.2, .9, .3, 1) both; }
+  #riseDemo.playing .chip:nth-child(2) { animation-delay: .13s; }
+  #riseDemo.playing .chip:nth-child(3) { animation-delay: .26s; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ③ sweep 流光 */
+  #sweepDemo .base {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, #171a2b, #12142a);
+    display: grid; place-items: center;
+    font-size: 12.5px; color: #667090;
+  }
+  #sweepDemo .shine {
+    position: absolute; inset: 0; transform: translateX(-130%);
+    background: linear-gradient(115deg,
+      transparent 30%,
+      rgba(255, 255, 255, .09) 45%,
+      rgba(255, 255, 255, .2) 50%,
+      rgba(255, 255, 255, .09) 55%,
+      transparent 70%);
+  }
+  #sweepDemo.playing .shine { animation: sweep 1.5s ease both; }
+  @keyframes sweep {
+    from { transform: translateX(-130%); }
+    to   { transform: translateX(130%); }
+  }
+
+  /* ④ floaty + twinkle */
+  #floatDemo .icon {
+    width: 64px; height: 64px; border-radius: 20px; position: relative;
+    background: linear-gradient(135deg, var(--grad-1), var(--grad-2) 55%, var(--grad-3));
+    box-shadow: 0 10px 26px rgba(99, 102, 241, .45);
+    display: grid; place-items: center; font-size: 26px;
+    animation: floaty 2.6s ease-in-out infinite;
+  }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-7px); }
+  }
+  #floatDemo .spark {
+    position: absolute; width: 6px; height: 6px; border-radius: 50%;
+    background: #fff; animation: twinkle 1.6s ease-in-out infinite;
+  }
+  #floatDemo .spark.s1 { top: -10px; right: -12px; }
+  #floatDemo .spark.s2 { bottom: -6px; left: -14px; width: 4px; height: 4px; animation-delay: .8s; }
+  @keyframes twinkle {
+    0%, 100% { transform: scale(.4); opacity: .15; }
+    50%      { transform: scale(1);  opacity: .95; }
+  }
+
+  /* ⑤ 按钮微交互 */
+  #btnDemo { gap: 12px; }
+  #btnDemo .btn {
+    font-family: inherit; font-size: 13.5px; font-weight: 600;
+    height: 40px; padding: 0 18px; border: none; border-radius: 12px;
+    cursor: pointer; transition: transform .18s, box-shadow .18s;
+  }
+  #btnDemo .btn-ghost { background: rgba(255, 255, 255, .08); color: #cdd5f5; border: 1px solid var(--line); }
+  #btnDemo .btn-ghost:hover { transform: translateY(-2px); background: rgba(255, 255, 255, .14); }
+  #btnDemo .btn-primary { background: linear-gradient(135deg, var(--grad-1), var(--grad-2)); color: #fff;
+    box-shadow: 0 6px 18px rgba(99, 102, 241, .4); }
+  #btnDemo .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(99, 102, 241, .6); }
+  #btnDemo .btn:active { transform: translateY(0) scale(.96); }
+  #btnDemo .close-x {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255, 255, 255, .08); color: #a7b0d0;
+    border: none; font-size: 17px; cursor: pointer;
+    transition: transform .25s, background .2s;
+  }
+  #btnDemo .close-x:hover { transform: rotate(90deg); background: rgba(255, 255, 255, .16); color: #fff; }
+
+  /* ⑥ 展开收起 */
+  #expandDemo { flex-direction: column; justify-content: center; padding: 14px; gap: 10px; }
+  #expandDemo .exp-btn {
+    font-family: inherit; font-size: 12.5px; color: #cdd5f5;
+    background: rgba(255, 255, 255, .08); border: 1px solid var(--line);
+    border-radius: 9px; padding: 7px 16px; cursor: pointer;
+  }
+  #expandDemo .exp-panel {
+    max-height: 0; overflow: hidden; opacity: 0; width: 100%;
+    transition: max-height .4s ease, opacity .35s ease;
+    font-size: 12.5px; color: #aab3d4;
+    background: rgba(255, 255, 255, .04); border-radius: 10px;
+  }
+  #expandDemo .exp-panel.open { max-height: 120px; opacity: 1; }
+  #expandDemo .exp-panel div {
+    display: flex; justify-content: space-between; padding: 7px 12px;
+  }
+  #expandDemo .exp-panel div + div { border-top: 1px solid var(--line); }
+
+  /* ⑦ 数字滚动 */
+  #countDemo {
+    font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums;
+    background: linear-gradient(90deg, #a78bfa, #60a5fa, #22d3ee);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  /* ⑧ 彩带 */
+  #confettiDemo { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+  #confettiDemo + .hint {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 12.5px; color: #667090; pointer-events: none;
+  }
+
+  /* ⑨ 视差 */
+  #tiltDemo {
+    width: 180px; height: 110px; border-radius: 14px; padding: 1px;
+    background: linear-gradient(160deg, rgba(255,255,255,.3), rgba(124,92,255,.5));
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .45);
+  }
+  #tiltDemo .inner {
+    width: 100%; height: 100%; border-radius: 13px;
+    background: linear-gradient(180deg, #171a2b, #12142a);
+    display: grid; place-items: center;
+    font-size: 12.5px; color: #8ea0ff; will-change: transform;
+  }
+
+  .note {
+    font-size: 13px; color: #9aa3c0;
+    background: rgba(139, 92, 246, .08);
+    border: 1px solid rgba(139, 92, 246, .25);
+    border-radius: 12px; padding: 12px 16px; margin-bottom: 20px;
+  }
+
+  footer { margin-top: 72px; text-align: center; font-size: 12.5px; color: #667090; }
+
+  @media (max-width: 860px) {
+    .a-row { grid-template-columns: 1fr; }
+    .a-side { min-height: 190px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+
+  <div class="wrap">
+    <header>
+      <p class="crumb">NOTES · <a href="index.html">← 返回卡片演示</a></p>
+      <h1>Token 奖励卡片的<span class="grad">动画与交互</span>学习笔记</h1>
+      <p class="lede">
+        本文拆解 <code>index.html</code> 弹窗卡片项目中的 6 个技术难点、3 组核心知识点，
+        以及 9 个可以直接抄走的动画样式——右侧每个演示都是真实运行的代码，点「重播」即可反复观察。
+      </p>
+      <nav class="toc">
+        <a href="#difficulty">01 · 技术难点</a>
+        <a href="#knowledge">02 · 知识点清单</a>
+        <a href="#animations">03 · 动画样式速查（可重播）</a>
+      </nav>
+    </header>
+
+    <main>
+      <!-- ================= 01 技术难点 ================= -->
+      <section id="difficulty">
+        <div class="sec-head"><span class="sec-num">01</span><h2>技术难点</h2></div>
+        <p class="sec-desc">做这个卡片时真正需要"想一下"的六个问题，以及各自的解法。</p>
+
+        <article class="d-card">
+          <div class="d-head"><span class="d-tag">难点 1</span><h3>一个 transform，两个主人</h3></div>
+          <p><b>难点：</b>弹窗入场动画 <code>popIn</code> 用 <code>transform</code> 做缩放位移，
+            3D 视差也要用 JS 写 <code>style.transform</code>——同一个元素的 transform 只有一个"所有权"，
+            两边同时控制会互相覆盖（倾斜会把入场动画顶掉，反之亦然）。</p>
+          <p><b>解法：</b>拆成两层。外层 <code>.reward-card</code> 只承担 CSS 入场动画，
+            内层 <code>.card-tilt</code> 专门接收 JS 写入的倾斜，CSS 与 JS 各管一层，互不打架。</p>
+          <pre><code>.overlay.show .reward-card { animation: popIn .55s cubic-bezier(.2,1.4,.3,1) both; } <span class="cm">/* 外层 */</span>
+.card-tilt { will-change: transform; }   <span class="cm">/* 内层：JS 的舞台 */</span></code></pre>
+        </article>
+
+        <article class="d-card">
+          <div class="d-head"><span class="d-tag">难点 2</span><h3>数字滚动：不抖动、可中断、手感好</h3></div>
+          <p><b>难点：</b>计数动画常见三个坑——数字宽度不一导致排版抖动；用"帧数"驱动导致不同刷新率速度不一致；
+            快速重复触发时两套动画叠加跳动。</p>
+          <p><b>解法：</b>① <code>font-variant-numeric: tabular-nums</code> 强制等宽数字；
+            ② 用 <code>performance.now()</code> 算时间进度 p∈[0,1]，再经缓动函数映射到数值；
+            ③ 每次开始前 <code>cancelAnimationFrame</code> 掉上一轮的句柄。</p>
+          <pre><code>const p = Math.min((now - t0) / duration, 1);
+const eased = 1 - Math.pow(2, -10 * p);              <span class="cm">// easeOutExpo：先冲刺后停靠</span>
+el.textContent = Math.round(TARGET * eased).toLocaleString("en-US");
+if (p &lt; 1) raf = requestAnimationFrame(frame);</code></pre>
+        </article>
+
+        <article class="d-card">
+          <div class="d-head"><span class="d-tag">难点 3</span><h3>彩带：用 2D Canvas 骗过眼睛的"假 3D"</h3></div>
+          <p><b>难点：</b>纸片彩带的灵魂在于"翻转时视觉上被压扁"，纯 2D 没有透视可用。</p>
+          <p><b>解法：</b>给每个粒子一个持续累加的相位 <code>wobble</code>，画矩形时高度乘以
+            <code>sin(wobble*2)</code>——正弦缩放就在视觉上模拟出了翻转压缩。加上三个物理量就足够真实：
+            重力（vy 每帧加常数）、空气阻力（vx、vy 每帧乘 0.985，指数衰减比线性减速自然）、
+            横向摆动（x 额外叠加 sin 偏移，模拟飘落摇曳）。</p>
+          <pre><code>p.vx *= 0.985;                    <span class="cm">// 空气阻力：指数衰减</span>
+p.vy  = p.vy * 0.985 + 0.16;      <span class="cm">// 阻力 + 重力</span>
+p.x  += p.vx + Math.sin(p.wobble) * 1.2;   <span class="cm">// 左右摇曳</span>
+const squash = Math.sin(p.wobble * 2) * .6 + 1;  <span class="cm">// 翻转压扁 = 假 3D</span>
+ctx.fillRect(-p.w/2, -p.h/2*squash, p.w, p.h*squash);</code></pre>
+        </article>
+
+        <article class="d-card">
+          <div class="d-head"><span class="d-tag">难点 4</span><h3>高分屏上 Canvas 发虚</h3></div>
+          <p><b>难点：</b>Canvas 默认 1 个物理像素对应 1 个 CSS 像素，在 2x/3x 屏上彩带会模糊。</p>
+          <p><b>解法：</b>画布物理尺寸放大 dpr 倍，再用 <code>setTransform</code> 把坐标系缩回来，
+            之后所有绘制代码照常写 CSS 像素。</p>
+          <pre><code>const dpr = Math.min(window.devicePixelRatio || 1, 2);   <span class="cm">// 上限 2，省电</span>
+canvas.width  = innerWidth  * dpr;
+canvas.height = innerHeight * dpr;
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0);</code></pre>
+        </article>
+
+        <article class="d-card">
+          <div class="d-head"><span class="d-tag">难点 5</span><h3>渐变描边卡片的两条路</h3></div>
+          <p><b>解法 A（本项目）：</b>外壳元素 <code>padding: 1px</code> + 渐变背景，内层元素深色背景盖住中间，
+            只露出 1px 渐变"边框"。简单直观，还能顺便把阴影、圆角分层处理。</p>
+          <p><b>解法 B（单元素）：</b>双背景 + <code>padding-box / border-box</code> 定位，
+            一条 border 全搞定：</p>
+          <pre><code>.card {
+  border: 1px solid transparent;
+  border-radius: 24px;
+  background:
+    linear-gradient(#161827, #0f111c) padding-box,   <span class="cm">/* 内容区填充 */</span>
+    linear-gradient(160deg, #fff3, #7c5cff88) border-box;  <span class="cm">/* 边框渐变 */</span>
+}</code></pre>
+        </article>
+
+        <article class="d-card">
+          <div class="d-head"><span class="d-tag">难点 6</span><h3>状态机与防重入：demo 可以无限重玩</h3></div>
+          <p><b>难点：</b>弹窗可反复打开、按钮可反复点击，任何残留状态（已领取的绿按钮、展开的明细、滚完的数字）
+            都会让第二次体验穿帮。</p>
+          <p><b>解法：</b>用 <code>isOpen / claimed / detailOpen</code> 三个布尔组成小状态机；
+            <code>openCard()</code> 里把所有 UI 状态完整复位；<code>claimed</code> 后立即
+            <code>disabled</code> 防重复提交；Toast 重复触发前先 <code>clearTimeout</code>，避免计时错乱。</p>
+          <pre><code>function openCard() {
+  if (isOpen) return;          <span class="cm">// 防重入</span>
+  claimed = false; detailOpen = false;
+  claimBtn.disabled = false;   <span class="cm">// —— 以下全是"复位"——</span>
+  claimBtn.textContent = "开心收下";
+  detailBox.classList.remove("open");
+  amountEl.textContent = fmt(0);
+  ...
+}</code></pre>
+        </article>
+      </section>
+
+      <!-- ================= 02 知识点 ================= -->
+      <section id="knowledge">
+        <div class="sec-head"><span class="sec-num">02</span><h2>知识点清单</h2></div>
+        <p class="sec-desc">按 CSS / JS / 交互三组整理，每条都能在项目源码里找到对应实现。</p>
+
+        <div class="k-grid">
+          <div class="k-group">
+            <h3>CSS 篇</h3>
+            <ul>
+              <li><code>cubic-bezier(.2, 1.4, .3, 1)</code>：控制点 y &gt; 1 会让动画值<b>冲过终点再弹回</b>，弹窗"果冻感"的来源。</li>
+              <li><code>animation-fill-mode: both</code>：延迟期间应用首帧、结束后保持尾帧，错峰入场不会先闪现。</li>
+              <li><code>backdrop-filter: blur()</code>：遮罩毛玻璃，需配半透明背景色。</li>
+              <li><code>background-clip: text</code> + <code>color: transparent</code>：渐变文字。</li>
+              <li><code>text-shadow</code> 对透明文字依然绘制：渐变字也能有光晕。</li>
+              <li><code>mask-image</code> 径向渐变：让背景网格向边缘淡出，零图片。</li>
+              <li><code>:not()</code> 排除 + <code>nth-child</code> 递增 delay：错峰入场（stagger）。</li>
+              <li><code>max-height</code> 0→N 过渡：展开收起；进阶方案 <code>grid-template-rows: 0fr→1fr</code> 免估高度。</li>
+              <li><code>will-change: transform</code>：提示浏览器建合成层，别滥用。</li>
+              <li><code>@media (prefers-reduced-motion)</code>：尊重系统"减少动态效果"。</li>
+            </ul>
+          </div>
+          <div class="k-group">
+            <h3>JS / Canvas 篇</h3>
+            <ul>
+              <li><code>requestAnimationFrame</code> 时间驱动：按时间戳算进度，与刷新率解耦。</li>
+              <li>缓动函数 = 进度的非线性映射：换一个函数就换一种"手感"。</li>
+              <li><b>lerp 插值</b> <code>cur += (target - cur) * 0.12</code>：视差/跟随/惯性的万能公式。</li>
+              <li>指数衰减阻力 <code>vx *= 0.985</code>：比线性减速更自然的粒子运动。</li>
+              <li>正弦缩放模拟 3D：2D 里"骗"出翻转透视。</li>
+              <li><code>devicePixelRatio</code> 适配：Canvas 高清三件套（放大物理尺寸 → setTransform → 照常画）。</li>
+              <li><code>ctx.save()/restore()</code> + translate/rotate：局部坐标系互不污染。</li>
+              <li>RAF 按需启停：粒子清空后 cancel，避免看不见的空转耗电。</li>
+              <li>定时器句柄成对管理：cancel 旧的再开新的，快速连点不叠帧。</li>
+            </ul>
+          </div>
+          <div class="k-group">
+            <h3>交互与无障碍篇</h3>
+            <ul>
+              <li><code>e.target === overlay</code> 才关窗：点击卡片内部会冒泡到遮罩，必须判断真实点击目标。</li>
+              <li><code>role="dialog"</code> + <code>aria-modal</code> + <code>aria-labelledby</code>：读屏软件眼中的模态框。</li>
+              <li><code>aria-hidden</code> 与视觉状态同步切换。</li>
+              <li>Esc 全局监听：模态框标准逃生通道。</li>
+              <li>按钮三态：默认 → loading（spinner + disabled）→ success（变色 + ✓），杜绝"点了没反应"。</li>
+              <li>Toast 替代 <code>alert()</code>：非阻断提示，重复触发先 clearTimeout。</li>
+              <li>状态复位：重开即还原，演示才能无限重玩。</li>
+              <li>错峰入场：元素依次出现比整块出现更有质感，成本只是几个 delay。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 03 动画速查 ================= -->
+      <section id="animations">
+        <div class="sec-head"><span class="sec-num">03</span><h2>动画样式速查</h2></div>
+        <p class="sec-desc">9 个可以直接抄走的动画/交互样式，全部来自项目真实代码，点「重播」或按提示操作现场体验。</p>
+        <p class="note">
+          💡 重播 CSS 动画的通用套路：先 <code>classList.remove()</code> 移除动画 class →
+          <code>void el.offsetWidth</code> 强制重排重置动画 → 再把 class 加回来。
+        </p>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>① popIn 弹性入场</h3>
+            <p>弹窗出场的主力动画。核心是贝塞尔曲线第二个控制点 y=1.4：值冲过 1 再回落，产生"果冻"般的过冲回弹，比 ease-out 有生命力得多。</p>
+            <pre><code>animation: popIn .55s cubic-bezier(.2, 1.4, .3, 1) both;
+@keyframes popIn {
+  from { transform: scale(.7) translateY(40px); opacity: 0; }
+}</code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage"><div id="popDemo" class="playing">弹窗卡片</div></div>
+            <button class="replay" data-replay="#popDemo">↻ 重播</button>
+          </div>
+        </article>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>② rise 错峰上浮（stagger）</h3>
+            <p>卡片内容逐条出现。每个子元素同一段动画，仅 <code>nth-child</code> 递增 0.05s 延迟；<code>fill-mode: both</code> 保证延迟期间保持首帧的透明。</p>
+            <pre><code>.overlay.show .card-tilt &gt; *:not(.shine) { animation: rise .55s ease both; }
+.overlay.show .card-tilt &gt; :nth-child(5) { animation-delay: .18s; }</code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage" id="riseDemo">
+              <span class="chip">图标</span><span class="chip">标题</span><span class="chip">按钮</span>
+            </div>
+            <button class="replay" data-replay="#riseDemo">↻ 重播</button>
+          </div>
+        </article>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>③ sweep 流光扫过</h3>
+            <p>一条斜向高光带从左扫到右，模拟玻璃反光。关键：渐变带透明区收尾 + <code>translateX</code> 平移，<code>overflow: hidden</code> 裁剪。项目里设为 <code>infinite</code> 循环、延迟 1.2s 起。</p>
+            <pre><code>.shine { transform: translateX(-120%); animation: sweep 3.6s ease-in-out 1.2s infinite; }
+@keyframes sweep { 55%, 100% { transform: translateX(120%); } }</code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage" id="sweepDemo"><div class="base">卡片表面</div><div class="shine"></div></div>
+            <button class="replay" data-replay="#sweepDemo">↻ 重播</button>
+          </div>
+        </article>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>④ floaty 悬浮 + twinkle 闪烁</h3>
+            <p>奖励图标上下悬浮（transform 循环），两颗星点错相位闪烁（scale + opacity + animation-delay）。常驻动画费用极低，纯 transform/opacity 不触发重排。</p>
+            <pre><code>.icon { animation: floaty 3s ease-in-out infinite; }
+.spark { animation: twinkle 1.8s ease-in-out infinite; }
+.spark:last-child { animation-delay: .9s; }  <span class="cm">/* 错相位 */</span></code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage" id="floatDemo">
+              <div class="icon">⚡<span class="spark s1"></span><span class="spark s2"></span></div>
+            </div>
+            <button class="replay" data-replay="#floatDemo">↻ 重播</button>
+          </div>
+        </article>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>⑤ 按钮微交互三件套</h3>
+            <p>悬停 <code>translateY(-2px)</code> + 阴影增强 = "浮起来"；按下 <code>scale(.97)</code> = "按下去"；圆形关闭钮悬停 <code>rotate(90deg)</code>。鼠标移到右侧按钮上感受。</p>
+            <pre><code>.btn:hover  { transform: translateY(-2px); box-shadow: 0 12px 30px ...; }
+.btn:active { transform: translateY(0) scale(.98); }
+.close:hover { transform: rotate(90deg); }</code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage" id="btnDemo">
+              <button class="btn btn-ghost">查看明细</button>
+              <button class="btn btn-primary">开心收下</button>
+              <button class="close-x" aria-label="关闭">×</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>⑥ 展开收起（max-height 过渡）</h3>
+            <p><code>max-height: 0 → 170px</code> 配合 <code>opacity</code>，transition 自动补间。注意要预估一个够用的上限值；要求更精确可改用 <code>grid-template-rows: 0fr → 1fr</code>。</p>
+            <pre><code>.detail { max-height: 0; opacity: 0; overflow: hidden; transition: max-height .4s ease, opacity .35s; }
+.detail.open { max-height: 170px; opacity: 1; }</code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage" id="expandDemo">
+              <button class="exp-btn" id="expandBtn">展开明细</button>
+              <div class="exp-panel" id="expandPanel">
+                <div><span>新手专享礼包</span><b>2,000 万</b></div>
+                <div><span>邀请好友奖励</span><b>3,000 万</b></div>
+                <div><span>限时冲榜活动</span><b>5,000 万</b></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>⑦ 数字滚动 count-up</h3>
+            <p>时间驱动 + easeOutExpo 缓动 + <code>tabular-nums</code> 等宽数字。先快后慢的"冲刺停靠"节奏比匀速计数更有获得感的爆发感。</p>
+            <pre><code>const p    = Math.min((now - t0) / duration, 1);
+const eased = 1 - Math.pow(2, -10 * p);   <span class="cm">// easeOutExpo</span>
+el.textContent = Math.round(target * eased).toLocaleString();</code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage"><span id="countDemo">0</span></div>
+            <button class="replay" id="countReplay">↻ 重播</button>
+          </div>
+        </article>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>⑧ 彩带喷发（点击画布）</h3>
+            <p>完整粒子系统：扇形初速、重力、空气阻力、摆动、翻转压扁、寿命淡出，粒子清空后 RAF 自动停止。点击右侧画布任意位置，从点击点喷发。</p>
+            <pre><code>const angle = -Math.PI/2 + (Math.random() - .5) * Math.PI * 1.1;  <span class="cm">// 向上扇形</span>
+const speed = power * (.4 + Math.random() * .8);
+pieces.push({ x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, ... });</code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage">
+              <canvas id="confettiDemo"></canvas>
+              <span class="hint">点击画布喷彩带 🎉</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="a-row">
+          <div class="a-info">
+            <h3>⑨ 3D 视差倾斜</h3>
+            <p>鼠标位置归一化到 -0.5~0.5 映射为旋转角，再用 lerp 每帧向目标角度插值 12%——平滑跟随的关键。鼠标移到右侧小卡片上体验。</p>
+            <pre><code>ry = ((e.clientX - r.left) / r.width - .5) * 10;   <span class="cm">// 归一化 → 角度</span>
+cur += (target - cur) * .12;                        <span class="cm">// lerp 跟随</span>
+tilt.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;</code></pre>
+          </div>
+          <div class="a-side">
+            <div class="a-stage">
+              <div id="tiltDemo"><div class="inner">移入试试 →</div></div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer>Token 奖励卡片 · 学习笔记 —— 与 <a href="index.html">index.html</a> 同目录，双击即可打开</footer>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- 通用：CSS 动画重播 ---------- */
+  document.querySelectorAll("[data-replay]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var el = document.querySelector(btn.getAttribute("data-replay"));
+      if (!el) return;
+      el.classList.remove("playing");
+      void el.offsetWidth; /* 强制重排，重置动画 */
+      el.classList.add("playing");
+    });
+  });
+
+  /* 首次进入自动播一遍前三个演示 */
+  setTimeout(function () {
+    ["#popDemo", "#riseDemo", "#sweepDemo"].forEach(function (sel) {
+      var el = document.querySelector(sel);
+      if (el) { el.classList.remove("playing"); void el.offsetWidth; el.classList.add("playing"); }
+    });
+  }, 500);
+
+  /* ---------- ⑥ 展开收起 ---------- */
+  var expBtn = document.getElementById("expandBtn");
+  var expPanel = document.getElementById("expandPanel");
+  expBtn.addEventListener("click", function () {
+    var open = expPanel.classList.toggle("open");
+    expBtn.textContent = open ? "收起明细" : "展开明细";
+  });
+
+  /* ---------- ⑦ 数字滚动 ---------- */
+  (function () {
+    var el = document.getElementById("countDemo");
+    var raf = null;
+    function run() {
+      if (raf) cancelAnimationFrame(raf);
+      var t0 = performance.now(), dur = 1500, target = 100000000;
+      (function frame(now) {
+        var p = Math.min((now - t0) / dur, 1);
+        var eased = 1 - Math.pow(2, -10 * p);
+        el.textContent = Math.round(target * eased).toLocaleString("en-US");
+        if (p < 1) raf = requestAnimationFrame(frame);
+        else { el.textContent = target.toLocaleString("en-US"); raf = null; }
+      })(t0);
+    }
+    document.getElementById("countReplay").addEventListener("click", run);
+    setTimeout(run, 800);
+  })();
+
+  /* ---------- ⑧ 彩带（迷你版引擎） ---------- */
+  (function () {
+    var cv = document.getElementById("confettiDemo");
+    var ctx = cv.getContext("2d");
+    var COLORS = ["#7c5cff", "#4f8cff", "#22d3ee", "#f472b6", "#facc15", "#a3e635"];
+    var pieces = [], raf = null;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    function fit() {
+      var r = cv.getBoundingClientRect();
+      cv.width = r.width * dpr;
+      cv.height = r.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener("resize", fit);
+    fit();
+
+    function burst(x, y) {
+      for (var i = 0; i < 70; i++) {
+        var a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.2;
+        var s = 7 * (0.4 + Math.random() * 0.8);
+        pieces.push({
+          x: x, y: y,
+          vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+          w: 5 + Math.random() * 6, h: 7 + Math.random() * 8,
+          c: COLORS[(Math.random() * COLORS.length) | 0],
+          rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+          life: 0, ttl: 110 + Math.random() * 60,
+          wob: Math.random() * Math.PI * 2
+        });
+      }
+      if (!raf) tick();
+    }
+
+    function tick() {
+      ctx.clearRect(0, 0, cv.width / dpr, cv.height / dpr);
+      pieces = pieces.filter(function (p) { return p.life < p.ttl && p.y < cv.height / dpr + 30; });
+      pieces.forEach(function (p) {
+        p.life++;
+        p.vx *= 0.985;
+        p.vy = p.vy * 0.985 + 0.18;
+        p.x += p.vx + Math.sin(p.wob) * 1.1;
+        p.wob += 0.12;
+        p.y += p.vy;
+        p.rot += p.vr;
+        var al = p.life > p.ttl - 25 ? (p.ttl - p.life) / 25 : 1;
+        var sq = Math.sin(p.wob * 2) * 0.6 + 1;
+        ctx.save();
+        ctx.globalAlpha = Math.max(al, 0);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.c;
+        ctx.fillRect(-p.w / 2, (-p.h / 2) * sq, p.w, p.h * sq);
+        ctx.restore();
+      });
+      raf = pieces.length ? requestAnimationFrame(tick) : null;
+    }
+
+    cv.addEventListener("click", function (e) {
+      var r = cv.getBoundingClientRect();
+      burst(e.clientX - r.left, e.clientY - r.top);
+    });
+  })();
+
+  /* ---------- ⑨ 3D 视差 ---------- */
+  (function () {
+    var card = document.getElementById("tiltDemo");
+    var curY = 0, curX = 0, tgtY = 0, tgtX = 0, raf = null;
+    function loop() {
+      raf = requestAnimationFrame(function () {
+        curY += (tgtY - curY) * 0.12;
+        curX += (tgtX - curX) * 0.12;
+        card.style.transform = "perspective(600px) rotateX(" + curX.toFixed(2) +
+          "deg) rotateY(" + curY.toFixed(2) + "deg)";
+        if (Math.abs(tgtY - curY) > 0.01 || Math.abs(tgtX - curX) > 0.01) loop();
+        else raf = null;
+      });
+    }
+    card.addEventListener("mousemove", function (e) {
+      var r = card.getBoundingClientRect();
+      tgtY = ((e.clientX - r.left) / r.width - 0.5) * 14;
+      tgtX = -((e.clientY - r.top) / r.height - 0.5) * 10;
+      if (!raf) loop();
+    });
+    card.addEventListener("mouseleave", function () {
+      tgtX = 0; tgtY = 0;
+      if (!raf) loop();
+    });
+  })();
+})();
+</script>
+</body>
+</html>
